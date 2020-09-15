@@ -11,6 +11,10 @@
  */
 declare(strict_types=1);
 
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
 /**
  * This is needed for cookie based authentication to encrypt password in
  * cookie. Needs to be 32 chars long.
@@ -27,12 +31,35 @@ $i = 0;
  */
 $i++;
 /* Authentication type */
-$cfg['Servers'][$i]['auth_type'] = 'cookie';
+if (isset($_GET['token'])) {
+    $authFilePath = __DIR__ . '/../tmp/' . $_GET['token'] . '.pma';
+    if (file_exists($authFilePath)) {
+        $authData = file_get_contents($authFilePath);
+        $authData = json_decode($authData, true);
+        if (isset($authData['user']) && isset($authData['password'])) {
+            $_SESSION['user'] = $authData['user'];
+            $_SESSION['password'] = $authData['password'];
+            if (file_exists($authFilePath)) {
+                unlink($authFilePath);
+            }
+        } else {
+            echo "<h1>Permission denied</h1>";
+            die();
+        }
+    }
+}
+$cfg['Servers'][$i]['auth_type'] = 'config';
+if ($_SESSION['user'] && $_SESSION['password']) {
+    $cfg['Servers'][$i]['user'] = $_SESSION['user'];
+    $cfg['Servers'][$i]['password'] = $_SESSION['password'];
+}
+
 /* Server parameters */
 $cfg['Servers'][$i]['host'] = 'localhost';
 $cfg['Servers'][$i]['compress'] = false;
 $cfg['Servers'][$i]['AllowNoPassword'] = false;
 
+session_write_close();
 /**
  * phpMyAdmin configuration storage settings.
  */
@@ -153,3 +180,7 @@ $cfg['SaveDir'] = '';
  * You can find more configuration options in the documentation
  * in the doc/ folder or at <https://docs.phpmyadmin.net/>.
  */
+
+if (isset($_GET['token'])) {
+    header('location: ./index.php');
+}
